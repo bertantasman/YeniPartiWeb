@@ -38,11 +38,18 @@ export async function openReport() {
   } catch (e) { setStatus(e.userMessage ?? e.message ?? 'Teşkilatlar yüklenemedi.', true); }
 }
 
+function downloadWorkbook(report, filename, toastFn) {
+  const blob = buildXlsx(reportSheets(report));
+  const a = Object.assign(document.createElement('a'), {href: URL.createObjectURL(blob), download: filename});
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  toastFn('Excel dosyası indirildi.');
+}
+
 function renderPreview(report) {
   const attended = report.events.reduce((n, e) => n + e.attendedCount, 0);
   const avg = report.events.length && report.organization.memberCount ? attended / (report.events.length * report.organization.memberCount) : null;
   $('#report-summary').innerHTML = `<article><div class="stat-top">Etkinlik</div><strong>${report.events.length}</strong><small>Seçilen aralıkta (aktif + tamamlanan)</small></article><article><div class="stat-top">Toplam katılım</div><strong>${attended}</strong><small>${report.organization.memberCount} onaylı üye</small></article><article><div class="stat-top">Ortalama katılım oranı</div><strong>${pct(avg)}</strong><small>Katılım ÷ (etkinlik × üye)</small></article>`;
-  $('#report-rows').innerHTML = report.events.map(e => `<tr><td>${esc(e.title)}</td><td>${esc(new Date(e.startMillis).toLocaleString('tr-TR', {dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Istanbul'}))}</td><td>${e.attendedCount} / ${e.memberCount}</td><td>${pct(e.rate)}</td></tr>`).join('') || '<tr><td colspan="4">Bu aralıkta etkinlik yok.</td></tr>';
+  $('#report-rows').innerHTML = report.events.map(e => `<tr><td>${esc(e.title)}</td><td>${esc(new Date(e.startMillis).toLocaleString('tr-TR', {dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Istanbul'}))}</td><td>${e.attendedCount} / ${e.memberCount}</td><td>${pct(e.rate)}</td><td><button class="secondary event-report-download" type="button" data-event-id="${esc(e.id)}">Etkinlik Excel'i</button></td></tr>`).join('') || '<tr><td colspan="5">Bu aralıkta etkinlik yok.</td></tr>';
   $('#report-result').hidden = false;
 }
 
@@ -60,9 +67,14 @@ export function initReport(toast) {
   });
   $('#report-download').addEventListener('click', () => {
     if (!lastReport) return;
-    const blob = buildXlsx(reportSheets(lastReport));
-    const a = Object.assign(document.createElement('a'), {href: URL.createObjectURL(blob), download: `katilim-raporu-${new Date().toISOString().slice(0, 10)}.xlsx`});
-    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-    toast('Excel dosyası indirildi. Kişisel veri içerir, dikkatli paylaşın.');
+    downloadWorkbook(lastReport, `katilim-raporu-${new Date().toISOString().slice(0, 10)}.xlsx`, toast);
+  });
+  $('#report-rows').addEventListener('click', e => {
+    const button = e.target.closest('[data-event-id]');
+    if (!button || !lastReport) return;
+    const event = lastReport.events.find(item => item.id === button.dataset.eventId);
+    if (!event) return;
+    const safeTitle = event.title.toLocaleLowerCase('tr-TR').replace(/[^a-z0-9ğüşöçıİĞÜŞÖÇ]+/gi, '-').replace(/^-|-$/g, '') || 'etkinlik';
+    downloadWorkbook({...lastReport, events: [event]}, `etkinlik-katilim-${safeTitle}-${new Date(event.startMillis).toISOString().slice(0, 10)}.xlsx`, toast);
   });
 }
