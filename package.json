@@ -1,0 +1,17 @@
+{
+  "name": "yeniparti-admin-web",
+  "private": true,
+  "scripts": {
+    "build": "esbuild src/firebase-sdk.js --bundle --format=esm --minify --outfile=dist/firebase-sdk.js",
+    "test": "node --test functions/test/*.test.cjs"
+  },
+  "dependencies": {
+    "firebase": "13.1.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.13.6"
+  }
+}
